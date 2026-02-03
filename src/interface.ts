@@ -50,6 +50,19 @@ interface BaseResponse {
   trading_name: string;
 }
 
+export interface OAuthToken {
+  access_token: string;
+  token_type: string;
+  expires_in: number;
+  refresh_token: string;
+}
+
+export interface OAuthResponse {
+  success: boolean;
+  data: OAuthToken;
+  message: string;
+}
+
 export interface FuelStationResponse extends BaseResponse {
   is_same_trading_and_brand_name: boolean;
   brand_name: string;

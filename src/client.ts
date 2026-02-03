@@ -1,18 +1,16 @@
 import cache from "./cache.js";
-import type { FuelStationResponse, FuelPriceResponse } from "./interface.js";
+import type {
+  FuelStationResponse,
+  FuelPriceResponse,
+  OAuthResponse,
+  OAuthToken,
+} from "./interface.js";
 
 export interface ClientConfig {
   baseUrl: URL;
   apiVersion: number;
   clientId: string;
   clientSecret: string;
-}
-
-interface OAuthToken {
-  access_token: string;
-  token_type: string;
-  expires_in: number;
-  refresh_token: string;
 }
 
 interface RequestOptions extends RequestInit {
@@ -36,7 +34,9 @@ export default class Client {
 
   get headers() {
     return {
-      ...(this.token && { Authorization: `Bearer ${this.token.access_token}` }),
+      ...(this.token && {
+        Authorization: `${this.token.token_type} ${this.token.access_token}`,
+      }),
       "Content-Type": "application/json",
     };
   }
@@ -49,27 +49,25 @@ export default class Client {
     const input = new URL(url, this.apiUrl);
     const { authenticate = true } = request;
     console.debug(`${(request.method || "get").toUpperCase()} ${input}`);
-    return fetch(input, {
-      headers: this.headers,
-      ...request,
-    })
-      .then((response) => {
-        if (response.ok) {
-          return response.json();
-        } else if ([401, 403].includes(response.status) && authenticate) {
-          return this.refreshToken()
-            .catch(() => this.authenticate())
-            .then(() => this.request(url, request));
-        }
-        return Promise.reject(response);
-      })
-      .catch((error) => {
-        if (error instanceof Response) {
-          console.error(`Received ${error.status} ${error.statusText}`);
-        } else {
-          console.error(error);
-        }
+    try {
+      const response = await fetch(input, {
+        headers: this.headers,
+        ...request,
       });
+      if (response.ok) {
+        return await response.json();
+      } else if ([401, 403].includes(response.status) && authenticate) {
+        try {
+          await this.refreshToken();
+        } catch {
+          await this.authenticate();
+        }
+        return this.request(url, request);
+      }
+      throw new Error(`Received ${response.status} ${response.statusText}`);
+    } catch (error) {
+      console.error(error);
+    }
   }
 
   async get(url: string, request?: RequestOptions) {
@@ -81,18 +79,18 @@ export default class Client {
   }
 
   async authenticate() {
-    this.token = (
-      await this.post("oauth/generate_access_token", {
-        body: JSON.stringify({
-          client_id: this.config.clientId,
-          client_secret: this.config.clientSecret,
-        }),
-        authenticate: false,
-      })
-    ).data;
-    if (!this.token) {
+    const response = (await this.post("oauth/generate_access_token", {
+      body: JSON.stringify({
+        client_id: this.config.clientId,
+        client_secret: this.config.clientSecret,
+      }),
+      authenticate: false,
+    })) as OAuthResponse;
+    const token = response.data;
+    if (!token || !token.access_token) {
       throw new Error("Authentication failed");
     }
+    this.token = token;
     console.debug("Received access token");
   }
 
@@ -100,15 +98,18 @@ export default class Client {
     if (!this.token?.refresh_token) {
       throw new Error("Refresh token does not exist");
     }
-    const token = await this.post("oauth/regenerate_access_token", {
+    const token = (await this.post("oauth/regenerate_access_token", {
       body: JSON.stringify({
         client_id: this.config.clientId,
         refresh_token: this.token.refresh_token,
       }),
       authenticate: false,
-    });
+    })) as Omit<OAuthToken, "refresh_token">;
+    if (!token || !token.access_token) {
+      throw new Error("Failed to refresh token");
+    }
     this.token = { ...this.token, ...token };
-    console.debug("Updated access token");
+    console.debug("Refreshed access token");
   }
 
   private async getAll<T>(
