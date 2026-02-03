@@ -1,4 +1,5 @@
 import cache from "./cache.js";
+import type { FuelStationResponse, FuelPriceResponse } from "./interface.js";
 
 export interface ClientConfig {
   baseUrl: URL;
@@ -15,7 +16,7 @@ interface OAuthToken {
 }
 
 interface RequestOptions extends RequestInit {
-  authenticate?: boolean;
+  authenticate?: boolean; // Prevent authentication loop
 }
 
 export default class Client {
@@ -110,11 +111,11 @@ export default class Client {
     console.debug("Updated access token");
   }
 
-  private async getAll(
-    fn: (batchNumber: number) => Promise<unknown[]>,
+  private async getAll<T>(
+    fn: (batchNumber: number) => Promise<T[]>,
     start: number = Client.MIN_BATCH_NUMBER,
   ) {
-    const results: unknown[] = [];
+    const results: T[] = [];
     let batchNumber = start;
     let data = await fn(batchNumber);
     while (data.length !== 0) {
@@ -126,7 +127,9 @@ export default class Client {
   }
 
   @cache(Client.CACHE_TTL)
-  async getFuelStations(batchNumber: number = Client.MIN_BATCH_NUMBER) {
+  async getFuelStations(
+    batchNumber: number = Client.MIN_BATCH_NUMBER,
+  ): Promise<FuelStationResponse[]> {
     return this.get(`pfs?batch-number=${batchNumber}`);
   }
 
@@ -137,7 +140,9 @@ export default class Client {
   }
 
   @cache(Client.CACHE_TTL)
-  async getFuelPrices(batchNumber: number = Client.MIN_BATCH_NUMBER) {
+  async getFuelPrices(
+    batchNumber: number = Client.MIN_BATCH_NUMBER,
+  ): Promise<FuelPriceResponse[]> {
     return this.get(`pfs/fuel-prices?batch-number=${batchNumber}`);
   }
 
