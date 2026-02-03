@@ -14,6 +14,10 @@ interface OAuthToken {
   refresh_token: string;
 }
 
+interface RequestOptions extends RequestInit {
+  authenticate?: boolean;
+}
+
 export default class Client {
   static readonly MIN_BATCH_NUMBER = 1;
   static readonly CACHE_TTL = 60 * 5;
@@ -40,17 +44,21 @@ export default class Client {
     return new URL(`v${this.config.apiVersion}/`, this.config.baseUrl).href;
   }
 
-  async request(url: string, method: string, body?: BodyInit) {
+  async request(url: string, request: RequestOptions): Promise<any> {
     const input = new URL(url, this.apiUrl);
-    console.debug(`${method.toUpperCase()} ${input}`);
+    const { authenticate = true } = request;
+    console.debug(`${(request.method || "get").toUpperCase()} ${input}`);
     return fetch(input, {
-      method: method,
-      body: body,
       headers: this.headers,
+      ...request,
     })
       .then((response) => {
         if (response.ok) {
           return response.json();
+        } else if ([401, 403].includes(response.status) && authenticate) {
+          return this.refreshToken()
+            .catch(() => this.authenticate())
+            .then(() => this.request(url, request));
         }
         return Promise.reject(response);
       })
@@ -63,23 +71,23 @@ export default class Client {
       });
   }
 
-  async get(url: string) {
-    return this.request(url, "GET");
+  async get(url: string, request?: RequestOptions) {
+    return this.request(url, { ...request, method: "GET" });
   }
 
-  async post(url: string, body?: BodyInit) {
-    return this.request(url, "POST", body);
+  async post(url: string, request?: RequestOptions) {
+    return this.request(url, { ...request, method: "POST" });
   }
 
   async authenticate() {
     this.token = (
-      await this.post(
-        "oauth/generate_access_token",
-        JSON.stringify({
+      await this.post("oauth/generate_access_token", {
+        body: JSON.stringify({
           client_id: this.config.clientId,
           client_secret: this.config.clientSecret,
         }),
-      )
+        authenticate: false,
+      })
     ).data;
     if (!this.token) {
       throw new Error("Authentication failed");
@@ -91,13 +99,13 @@ export default class Client {
     if (!this.token?.refresh_token) {
       throw new Error("Refresh token does not exist");
     }
-    const token = await this.post(
-      "oauth/regenerate_access_token",
-      JSON.stringify({
+    const token = await this.post("oauth/regenerate_access_token", {
+      body: JSON.stringify({
         client_id: this.config.clientId,
         refresh_token: this.token.refresh_token,
       }),
-    );
+      authenticate: false,
+    });
     this.token = { ...this.token, ...token };
     console.debug("Updated access token");
   }

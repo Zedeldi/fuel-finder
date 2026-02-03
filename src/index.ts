@@ -9,15 +9,6 @@ const app = express();
 const host = process.env.HOST || "127.0.0.1";
 const port = parseInt(process.env.PORT || "5000");
 
-app.use(async (_req, _res, next) => {
-  try {
-    await client.refreshToken();
-  } catch {
-    await client.authenticate();
-  }
-  next();
-});
-
 const batchNumberHandler: RequestHandler = (req, res, next) => {
   const batchNumber = req.query["batch-number"];
   res.locals.batchNumber = batchNumber
