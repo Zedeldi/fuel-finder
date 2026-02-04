@@ -11,8 +11,7 @@
     "serve": "node dist/index.js"
   },
   "dependencies": {
-    "express": "^5.2.1",
-    "node-cache": "^5.1.2"
+    "express": "^5.2.1"
   },
   "devDependencies": {
     "@eslint/js": "^9.39.2",

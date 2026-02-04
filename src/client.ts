@@ -1,4 +1,4 @@
-import cache from "./cache.js";
+import Cache from "./cache.js";
 import type {
   FuelStationResponse,
   FuelPriceResponse,
@@ -113,7 +113,7 @@ export default class Client {
     console.debug("Refreshed access token");
   }
 
-  @cache(Client.CACHE_TTL)
+  @Cache.cache(Client.CACHE_TTL)
   async getFuelStations(
     batchNumber: number = Client.MIN_BATCH_NUMBER,
   ): Promise<FuelStationResponse[]> {
@@ -127,7 +127,7 @@ export default class Client {
     );
   }
 
-  @cache(Client.CACHE_TTL)
+  @Cache.cache(Client.CACHE_TTL)
   async getFuelPrices(
     batchNumber: number = Client.MIN_BATCH_NUMBER,
   ): Promise<FuelPriceResponse[]> {
