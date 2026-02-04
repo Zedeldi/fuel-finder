@@ -5,7 +5,7 @@ import type {
   OAuthResponse,
   OAuthToken,
 } from "./interface.js";
-import { unpaginate } from "./utils.js";
+import { getUrlSearchParams, unpaginate } from "./utils.js";
 
 export interface ClientConfig {
   baseUrl: URL;
@@ -144,8 +144,13 @@ export default class Client {
 
   async getFuelStations(
     batchNumber: number = Client.MIN_BATCH_NUMBER,
+    effectiveStartTimestamp?: Date,
   ): Promise<FuelStationResponse[]> {
-    return this.get(`pfs?batch-number=${batchNumber}`);
+    const params = getUrlSearchParams({
+      "batch-number": batchNumber,
+      "effective-start-timestamp": effectiveStartTimestamp,
+    });
+    return this.get(`pfs?${params}`);
   }
 
   async getAllFuelStations() {
@@ -157,8 +162,13 @@ export default class Client {
 
   async getFuelPrices(
     batchNumber: number = Client.MIN_BATCH_NUMBER,
+    effectiveStartTimestamp?: Date,
   ): Promise<FuelPriceResponse[]> {
-    return this.get(`pfs/fuel-prices?batch-number=${batchNumber}`);
+    const params = getUrlSearchParams({
+      "batch-number": batchNumber,
+      "effective-start-timestamp": effectiveStartTimestamp,
+    });
+    return this.get(`pfs/fuel-prices?${params}`);
   }
 
   async getAllFuelPrices() {
