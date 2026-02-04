@@ -5,6 +5,7 @@ import type {
   OAuthResponse,
   OAuthToken,
 } from "./interface.js";
+import { unpaginate } from "./utils.js";
 
 export interface ClientConfig {
   baseUrl: URL;
@@ -45,7 +46,7 @@ export default class Client {
     return new URL(`v${this.config.apiVersion}/`, this.config.baseUrl).href;
   }
 
-  async request(url: string, request: RequestOptions): Promise<any> {
+  async request(url: string | URL, request: RequestOptions): Promise<any> {
     const input = new URL(url, this.apiUrl);
     const { authenticate = true } = request;
     console.debug(`${(request.method || "get").toUpperCase()} ${input}`);
@@ -70,11 +71,11 @@ export default class Client {
     }
   }
 
-  async get(url: string, request?: RequestOptions) {
+  async get(url: string | URL, request?: RequestOptions) {
     return this.request(url, { ...request, method: "GET" });
   }
 
-  async post(url: string, request?: RequestOptions) {
+  async post(url: string | URL, request?: RequestOptions) {
     return this.request(url, { ...request, method: "POST" });
   }
 
@@ -112,21 +113,6 @@ export default class Client {
     console.debug("Refreshed access token");
   }
 
-  private async getAll<T>(
-    fn: (batchNumber: number) => Promise<T[]>,
-    start: number = Client.MIN_BATCH_NUMBER,
-  ) {
-    const results: T[] = [];
-    let batchNumber = start;
-    let data = await fn(batchNumber);
-    while (data.length !== 0) {
-      results.push(...data);
-      batchNumber++;
-      data = await fn(batchNumber);
-    }
-    return results;
-  }
-
   @cache(Client.CACHE_TTL)
   async getFuelStations(
     batchNumber: number = Client.MIN_BATCH_NUMBER,
@@ -135,8 +121,9 @@ export default class Client {
   }
 
   async getAllFuelStations() {
-    return this.getAll(async (batchNumber?: number) =>
-      this.getFuelStations(batchNumber),
+    return unpaginate(
+      async (batchNumber?: number) => this.getFuelStations(batchNumber),
+      Client.MIN_BATCH_NUMBER,
     );
   }
 
@@ -148,8 +135,9 @@ export default class Client {
   }
 
   async getAllFuelPrices() {
-    return this.getAll(async (batchNumber?: number) =>
-      this.getFuelPrices(batchNumber),
+    return unpaginate(
+      async (batchNumber?: number) => this.getFuelPrices(batchNumber),
+      Client.MIN_BATCH_NUMBER,
     );
   }
 }
