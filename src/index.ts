@@ -10,10 +10,9 @@ const host = process.env.HOST || "127.0.0.1";
 const port = parseInt(process.env.PORT || "5000");
 
 const batchNumberHandler: RequestHandler = (req, res, next) => {
-  const batchNumber = req.query["batch-number"];
-  res.locals.batchNumber = batchNumber
-    ? parseInt(batchNumber as string)
-    : undefined;
+  const batchNumber = parseInt(req.query["batch-number"] as string);
+  res.locals.batchNumber =
+    isNaN(batchNumber) || !isFinite(batchNumber) ? undefined : batchNumber;
   next();
 };
 
