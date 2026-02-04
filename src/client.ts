@@ -12,22 +12,24 @@ export interface ClientConfig {
   apiVersion: number;
   clientId: string;
   clientSecret: string;
+  cacheTtl?: number;
 }
 
 interface RequestOptions extends RequestInit {
-  authenticate?: boolean; // Prevent authentication loop
+  retry?: boolean; // Prevent authentication loop
 }
 
 export default class Client {
   static readonly MIN_BATCH_NUMBER = 1;
-  static readonly CACHE_TTL = 60 * 5;
 
   config: ClientConfig;
   token: OAuthToken | null;
+  cache: Cache;
 
   constructor(config: ClientConfig, token?: OAuthToken) {
     this.config = config;
     this.token = token ?? null;
+    this.cache = new Cache({ ttl: config.cacheTtl });
     if (this.config.apiVersion > 1) {
       throw new Error(`API version ${this.config.apiVersion} is not supported`);
     }
@@ -46,28 +48,53 @@ export default class Client {
     return new URL(`v${this.config.apiVersion}/`, this.config.baseUrl).href;
   }
 
-  async request(url: string | URL, request: RequestOptions): Promise<any> {
+  private async fetch(
+    url: string | URL,
+    request: RequestOptions,
+  ): Promise<any> {
     const input = new URL(url, this.apiUrl);
-    const { authenticate = true } = request;
+    const { retry = true } = request;
     console.debug(`${(request.method || "get").toUpperCase()} ${input}`);
-    try {
-      const response = await fetch(input, {
-        headers: this.headers,
-        ...request,
-      });
-      if (response.ok) {
-        return await response.json();
-      } else if ([401, 403].includes(response.status) && authenticate) {
-        try {
-          await this.refreshToken();
-        } catch {
-          await this.authenticate();
-        }
-        return this.request(url, request);
+    const response = await fetch(input, {
+      headers: this.headers,
+      ...request,
+    });
+    if (response.ok) {
+      return await response.json();
+    } else if ([401, 403].includes(response.status) && retry) {
+      try {
+        await this.refreshToken();
+      } catch {
+        await this.authenticate();
       }
-      throw new Error(`Received ${response.status} ${response.statusText}`);
-    } catch (error) {
-      console.error(error);
+      // Retry request
+      return this.fetch(url, request);
+    }
+    throw new Error(`Received ${response.status} ${response.statusText}`);
+  }
+
+  private async request(url: string | URL, request: RequestOptions) {
+    const input = new URL(url, this.apiUrl);
+    const key = JSON.stringify({ url: input, method: request.method });
+    const { cache = "default" } = request;
+    switch (cache) {
+      case "default":
+        return (
+          this.cache.get(key) ||
+          this.cache.set(key, await this.fetch(input, request))
+        );
+      case "force-cache":
+        return (
+          this.cache.get(key, true) ||
+          this.cache.set(key, await this.fetch(input, request))
+        );
+      case "reload":
+      case "no-cache":
+        return this.cache.set(key, await this.fetch(input, request));
+      case "no-store":
+        return await this.fetch(input, request);
+      case "only-if-cached":
+        return this.cache.get(key, true);
     }
   }
 
@@ -85,7 +112,8 @@ export default class Client {
         client_id: this.config.clientId,
         client_secret: this.config.clientSecret,
       }),
-      authenticate: false,
+      retry: false,
+      cache: "no-store",
     })) as OAuthResponse;
     const token = response.data;
     if (!token || !token.access_token) {
@@ -104,7 +132,8 @@ export default class Client {
         client_id: this.config.clientId,
         refresh_token: this.token.refresh_token,
       }),
-      authenticate: false,
+      retry: false,
+      cache: "no-store",
     })) as Omit<OAuthToken, "refresh_token">;
     if (!token || !token.access_token) {
       throw new Error("Failed to refresh token");
@@ -113,7 +142,6 @@ export default class Client {
     console.debug("Refreshed access token");
   }
 
-  @Cache.cache(Client.CACHE_TTL)
   async getFuelStations(
     batchNumber: number = Client.MIN_BATCH_NUMBER,
   ): Promise<FuelStationResponse[]> {
@@ -127,7 +155,6 @@ export default class Client {
     );
   }
 
-  @Cache.cache(Client.CACHE_TTL)
   async getFuelPrices(
     batchNumber: number = Client.MIN_BATCH_NUMBER,
   ): Promise<FuelPriceResponse[]> {

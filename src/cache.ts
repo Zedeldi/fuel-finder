@@ -38,9 +38,9 @@ export default class Cache {
     this.config = { ...config };
   }
 
-  get(key: string) {
+  get(key: string, stale: boolean = false) {
     const item = this.storage.find((item) => item.key === key);
-    if (item && !item.expired) {
+    if (item && (!item.expired || stale)) {
       return item.value;
     }
   }
@@ -55,6 +55,7 @@ export default class Cache {
         ttl: ttl ?? this.config.ttl,
       }),
     );
+    return value;
   }
 
   delete(key: string) {
@@ -63,39 +64,5 @@ export default class Cache {
 
   prune() {
     this.storage = this.storage.filter((item) => !item.expired);
-  }
-
-  private static getKey(name: string, args: unknown[]) {
-    return `${name}_${JSON.stringify(args)}`;
-  }
-
-  static cache(ttl?: number) {
-    return function (
-      _target: unknown,
-      propertyKey: string,
-      descriptor: PropertyDescriptor,
-    ) {
-      const method = descriptor.value;
-      const cache = new Cache();
-      descriptor.value = async function (...args: unknown[]) {
-        const cacheKey = Cache.getKey(propertyKey, args);
-
-        const cachedResult = cache.get(cacheKey);
-        if (cachedResult) {
-          console.debug(`Returning cached result for ${cacheKey}`);
-          return cachedResult;
-        }
-
-        const result = await method.apply(this, args);
-        if (result) {
-          cache.set(cacheKey, result, ttl);
-          console.debug(`Caching result for ${cacheKey} (ttl=${ttl})`);
-        }
-
-        return result;
-      };
-
-      return descriptor;
-    };
   }
 }
