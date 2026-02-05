@@ -5,6 +5,7 @@ import { exhaust, getPromiseState, unpaginate, withDefault } from "./utils.js";
 export default class ClientService extends Client {
   private interval?: NodeJS.Timeout;
   private promise?: Promise<void[]>;
+  private date?: Date;
   nodes: Record<string, FuelStationNode>;
 
   constructor(config: ClientConfig, token?: OAuthToken) {
@@ -57,9 +58,14 @@ export default class ClientService extends Client {
       return;
     }
     console.debug("Refreshing service nodes");
+    // Set date before refreshing to avoid missing data
+    const date = new Date();
     this.promise = Promise.all(
       [this.getFuelStations, this.getFuelPrices].map(async (fn) => {
-        for await (const response of ClientService.generate(fn.bind(this))) {
+        for await (const response of ClientService.generate(
+          fn.bind(this),
+          this.date, // Last refresh date or undefined
+        )) {
           const data = ClientService.transform(response);
           Object.entries(data).forEach(([key, item]) => {
             const node = this.nodes[key];
@@ -69,6 +75,8 @@ export default class ClientService extends Client {
       }),
     );
     await this.promise;
+    // Update last refresh date
+    this.date = date;
     console.debug("Service nodes refreshed");
   }
 
