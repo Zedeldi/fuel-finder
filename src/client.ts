@@ -5,7 +5,7 @@ import type {
   OAuthResponse,
   OAuthToken,
 } from "./interface.js";
-import { getUrlSearchParams, unpaginate } from "./utils.js";
+import { getUrlSearchParams } from "./utils.js";
 
 export interface ClientConfig {
   baseUrl: URL;
@@ -20,7 +20,7 @@ interface RequestOptions extends RequestInit {
 }
 
 export default class Client {
-  static readonly MIN_BATCH_NUMBER = 1;
+  protected static readonly MIN_BATCH_NUMBER = 1;
 
   config: ClientConfig;
   token: OAuthToken | null;
@@ -153,13 +153,6 @@ export default class Client {
     return this.get(`pfs?${params}`);
   }
 
-  async getAllFuelStations() {
-    return unpaginate(
-      async (batchNumber?: number) => this.getFuelStations(batchNumber),
-      Client.MIN_BATCH_NUMBER,
-    );
-  }
-
   async getFuelPrices(
     batchNumber: number = Client.MIN_BATCH_NUMBER,
     effectiveStartTimestamp?: Date,
@@ -169,12 +162,5 @@ export default class Client {
       "effective-start-timestamp": effectiveStartTimestamp,
     });
     return this.get(`pfs/fuel-prices?${params}`);
-  }
-
-  async getAllFuelPrices() {
-    return unpaginate(
-      async (batchNumber?: number) => this.getFuelPrices(batchNumber),
-      Client.MIN_BATCH_NUMBER,
-    );
   }
 }

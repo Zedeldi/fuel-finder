@@ -43,7 +43,7 @@ interface FuelPrice {
   price_last_updated: string;
 }
 
-interface BaseResponse {
+export interface BaseResponse {
   node_id: string;
   mft_organisation_name: string;
   public_phone_number: string | null;
@@ -80,3 +80,5 @@ export interface FuelStationResponse extends BaseResponse {
 export interface FuelPriceResponse extends BaseResponse {
   fuel_prices: FuelPrice[];
 }
+
+export type FuelStationNode = Omit<BaseResponse, "node_id">;
