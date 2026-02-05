@@ -3,20 +3,17 @@ interface CacheConfig {
 }
 
 interface CacheItemInterface {
-  key: string;
   value: unknown;
   date: Date;
   ttl?: number;
 }
 
 class CacheItem implements CacheItemInterface {
-  key: string;
   value: unknown;
   date: Date;
   ttl?: number;
 
   constructor(item: CacheItemInterface) {
-    this.key = item.key;
     this.value = item.value;
     this.date = item.date;
     this.ttl = item.ttl;
@@ -32,37 +29,46 @@ class CacheItem implements CacheItemInterface {
 
 export default class Cache {
   config: CacheConfig;
-  storage: CacheItem[] = [];
+  storage: Record<string, CacheItem> = {};
 
   constructor(config?: CacheConfig) {
     this.config = { ...config };
   }
 
   get(key: string, stale: boolean = false) {
-    const item = this.storage.find((item) => item.key === key);
+    const item = this.storage[key];
     if (item && (!item.expired || stale)) {
+      console.debug(`Retrieving ${key} from cache`);
       return item.value;
     }
   }
 
   set(key: string, value: unknown, ttl?: number) {
-    this.delete(key);
-    this.storage.push(
-      new CacheItem({
-        key: key,
-        value: value,
-        date: new Date(),
-        ttl: ttl ?? this.config.ttl,
-      }),
-    );
+    console.debug(`Storing ${key} in cache`);
+    this.storage[key] = new CacheItem({
+      value: value,
+      date: new Date(),
+      ttl: ttl ?? this.config.ttl,
+    });
     return value;
   }
 
   delete(key: string) {
-    this.storage = this.storage.filter((item) => item.key !== key);
+    console.debug(`Deleting ${key} from cache`);
+    const { [key]: item, ...storage } = this.storage;
+    this.storage = storage;
+    return item.value;
   }
 
   prune() {
-    this.storage = this.storage.filter((item) => !item.expired);
+    console.debug("Removing expired items from cache");
+    this.storage = Object.fromEntries(
+      Object.entries(this.storage).filter(([_key, item]) => !item.expired),
+    );
+  }
+
+  flush() {
+    console.debug("Flushing cache storage");
+    Object.keys(this.storage).forEach((key) => this.delete(key));
   }
 }
