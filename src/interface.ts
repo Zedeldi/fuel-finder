@@ -81,4 +81,5 @@ export interface FuelPriceResponse extends BaseResponse {
   fuel_prices: FuelPrice[];
 }
 
-export type FuelStationNode = Omit<BaseResponse, "node_id">;
+export type FuelStationNode = Omit<BaseResponse, "node_id"> &
+  Partial<FuelStationResponse & FuelPriceResponse>;

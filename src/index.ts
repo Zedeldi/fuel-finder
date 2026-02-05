@@ -56,7 +56,7 @@ app.get("/node/:nodeId", async (req, res) => {
   res.send(service.nodes[req.params.nodeId]);
 });
 
-app.listen(port, host, async () => {
-  await service.start(60, true);
+app.listen(port, host, () => {
   console.log(`Server listening on http://${host}:${port}`);
+  service.start(60);
 });

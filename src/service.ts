@@ -1,15 +1,19 @@
 import Client, { type ClientConfig } from "./client.js";
 import type { BaseResponse, FuelStationNode, OAuthToken } from "./interface.js";
-import { unpaginate } from "./utils.js";
+import { exhaust, getPromiseState, unpaginate, withDefault } from "./utils.js";
 
 export default class ClientService extends Client {
   private interval?: NodeJS.Timeout;
-  private updating: boolean = false;
+  private promise?: Promise<void[]>;
   nodes: Record<string, FuelStationNode>;
 
   constructor(config: ClientConfig, token?: OAuthToken) {
     super(config, token);
     this.nodes = {};
+  }
+
+  private get state() {
+    return this.promise && getPromiseState(this.promise);
   }
 
   private static transform(data: BaseResponse[]) {
@@ -21,17 +25,21 @@ export default class ClientService extends Client {
     );
   }
 
-  private static async getAll(
+  private static generate(
     fn: (batchNumber?: number, ...args: any[]) => Promise<BaseResponse[]>,
     ...args: any[]
   ) {
-    return unpaginate(async (batchNumber?: number) => {
-      try {
-        return await fn(batchNumber, ...args);
-      } catch {
-        return [];
-      }
-    }, Client.MIN_BATCH_NUMBER);
+    return exhaust(
+      withDefault(async (batchNumber: number) => fn(batchNumber, ...args), []),
+      Client.MIN_BATCH_NUMBER,
+    );
+  }
+
+  private static getAll(
+    fn: (batchNumber?: number, ...args: any[]) => Promise<BaseResponse[]>,
+    ...args: any[]
+  ) {
+    return unpaginate(ClientService.generate(fn, ...args));
   }
 
   async getAllFuelPrices() {
@@ -42,42 +50,45 @@ export default class ClientService extends Client {
     return ClientService.getAll(this.getFuelStations.bind(this));
   }
 
-  async update() {
-    if (this.updating) {
+  async refresh() {
+    // Previous refresh has not finished
+    if (this.promise !== undefined && (await this.state) === undefined) {
+      console.debug("Service is currently refreshing");
       return;
     }
-    this.updating = true;
-    const stations = ClientService.transform(await this.getAllFuelStations());
-    const prices = ClientService.transform(await this.getAllFuelPrices());
-    this.nodes = Object.fromEntries(
-      Object.entries(stations).map(([key, value]) => [
-        key,
-        {
-          ...value,
-          ...prices[key],
-        },
-      ]),
+    console.debug("Refreshing service nodes");
+    this.promise = Promise.all(
+      [this.getFuelStations, this.getFuelPrices].map(async (fn) => {
+        for await (const response of ClientService.generate(fn.bind(this))) {
+          const data = ClientService.transform(response);
+          Object.entries(data).forEach(([key, item]) => {
+            const node = this.nodes[key];
+            this.nodes[key] = { ...node, ...item };
+          });
+        }
+      }),
     );
-    this.updating = false;
+    await this.promise;
+    console.debug("Service nodes refreshed");
   }
 
-  async start(interval: number, wait?: boolean) {
+  start(interval: number) {
     if (this.interval) {
       throw new Error("Service already started");
     }
-    if (wait) {
-      await this.update();
-    }
     this.interval = setInterval(
-      async () => await this.update(),
+      async () => await this.refresh(),
       interval * 1000,
     );
+    console.debug(`Service started with refresh interval of ${interval}s`);
   }
 
-  async stop() {
+  stop() {
     if (!this.interval) {
       throw new Error("Service has not been started");
     }
     clearInterval(this.interval);
+    this.interval = undefined;
+    console.debug("Service stopped");
   }
 }
