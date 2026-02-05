@@ -44,11 +44,15 @@ export default class Cache {
   }
 
   set(key: string, value: unknown, ttl?: number) {
+    ttl = ttl ?? this.config.ttl;
+    if (ttl && ttl < 0) {
+      return value;
+    }
     console.debug(`Storing ${key} in cache`);
     this.storage[key] = new CacheItem({
       value: value,
       date: new Date(),
-      ttl: ttl ?? this.config.ttl,
+      ttl: ttl,
     });
     return value;
   }
