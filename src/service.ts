@@ -1,16 +1,28 @@
+import fs from "fs";
+
 import Client, { type ClientConfig } from "./client.js";
 import type { BaseResponse, FuelStationNode, OAuthToken } from "./interface.js";
 import { exhaust, getPromiseState, unpaginate, withDefault } from "./utils.js";
 
+interface ServiceData {
+  date?: Date;
+  nodes: Record<string, FuelStationNode>;
+}
+
 export default class ClientService extends Client {
   private interval?: NodeJS.Timeout;
   private promise?: Promise<void[]>;
-  private date?: Date;
-  nodes: Record<string, FuelStationNode>;
+  private data: ServiceData;
 
-  constructor(config: ClientConfig, token?: OAuthToken) {
+  constructor(config: ClientConfig, token?: OAuthToken, data?: ServiceData) {
     super(config, token);
-    this.nodes = {};
+    this.data = data || {
+      nodes: {},
+    };
+  }
+
+  get nodes() {
+    return this.data.nodes;
   }
 
   private get state() {
@@ -64,24 +76,45 @@ export default class ClientService extends Client {
       [this.getFuelStations, this.getFuelPrices].map(async (fn) => {
         for await (const response of ClientService.generate(
           fn.bind(this),
-          this.date, // Last refresh date or undefined
+          this.data.date, // Last refresh date or undefined
         )) {
           const data = ClientService.transform(response);
           Object.entries(data).forEach(([key, item]) => {
-            const node = this.nodes[key];
-            this.nodes[key] = { ...node, ...item };
+            const node = this.data.nodes[key];
+            this.data.nodes[key] = { ...node, ...item };
           });
         }
       }),
     );
     await this.promise;
     // Update last refresh date
-    this.date = date;
+    this.data.date = date;
     console.debug("Service nodes refreshed");
   }
 
   filter(fn: (entry: [string, FuelStationNode]) => unknown) {
-    return Object.fromEntries(Object.entries(this.nodes).filter(fn));
+    return Object.fromEntries(Object.entries(this.data.nodes).filter(fn));
+  }
+
+  load(path: string) {
+    fs.readFile(path, "utf8", (error, data) => {
+      if (error) {
+        console.error(`Failed to load service data: ${error}`);
+        return;
+      }
+      this.data = JSON.parse(data);
+      console.debug(`Session data loaded from ${path}`);
+    });
+  }
+
+  save(path: string) {
+    fs.writeFile(path, JSON.stringify(this.data), (error) => {
+      if (error) {
+        console.error(`Failed to save service data: ${error}`);
+        return;
+      }
+      console.debug(`Session data saved to ${path}`);
+    });
   }
 
   start(interval: number) {
