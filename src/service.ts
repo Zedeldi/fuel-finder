@@ -80,6 +80,10 @@ export default class ClientService extends Client {
     console.debug("Service nodes refreshed");
   }
 
+  filter(fn: (entry: [string, FuelStationNode]) => unknown) {
+    return Object.fromEntries(Object.entries(this.nodes).filter(fn));
+  }
+
   start(interval: number) {
     if (this.interval) {
       throw new Error("Service already started");

@@ -56,6 +56,14 @@ app.get("/node/:nodeId", async (req, res) => {
   res.send(service.nodes[req.params.nodeId]);
 });
 
+app.get("/node/by-postcode/:postcode", async (req, res) => {
+  res.send(
+    service.filter(([_id, node]) =>
+      node.location?.postcode.startsWith(req.params.postcode),
+    ),
+  );
+});
+
 app.listen(port, host, () => {
   console.log(`Server listening on http://${host}:${port}`);
   service.start(60);
