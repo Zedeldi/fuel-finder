@@ -41,13 +41,7 @@ interface FuelPrice {
   fuel_type: string;
   price: string;
   price_last_updated: string;
-}
-
-export interface BaseResponse {
-  node_id: string;
-  mft_organisation_name: string;
-  public_phone_number: string | null;
-  trading_name: string;
+  price_change_effective_timestamp: string;
 }
 
 export interface OAuthToken {
@@ -61,6 +55,13 @@ export interface OAuthResponse {
   success: boolean;
   data: OAuthToken;
   message: string;
+}
+
+export interface BaseResponse {
+  node_id: string;
+  mft_organisation_name: string;
+  public_phone_number: string | null;
+  trading_name: string;
 }
 
 export interface FuelStationResponse extends BaseResponse {
