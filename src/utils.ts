@@ -37,6 +37,21 @@ export function withDefault<T>(fn: (...args: any[]) => Promise<T>, value: T) {
   };
 }
 
+export function removeUndefined<T extends object>(data: T): Partial<T> {
+  return Object.fromEntries(
+    Object.entries(data).filter(
+      ([_key, value]) => value !== undefined && value?.length !== 0,
+    ),
+  ) as Partial<T>;
+}
+
+export function merge<T1 extends object, T2 extends object>(
+  parent: T1,
+  child: T2,
+): T1 & Partial<T2> {
+  return { ...parent, ...removeUndefined(child) };
+}
+
 export function getUrlSearchParams(params: object) {
   return new URLSearchParams(
     Object.fromEntries(

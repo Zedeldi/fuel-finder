@@ -2,7 +2,13 @@ import fs from "fs";
 
 import Client, { type ClientConfig } from "./client.js";
 import type { BaseResponse, FuelStationNode, OAuthToken } from "./interface.js";
-import { exhaust, getPromiseState, unpaginate, withDefault } from "./utils.js";
+import {
+  exhaust,
+  getPromiseState,
+  merge,
+  unpaginate,
+  withDefault,
+} from "./utils.js";
 
 interface ServiceData {
   date?: Date;
@@ -81,7 +87,7 @@ export default class ClientService extends Client {
           const data = ClientService.transform(response);
           Object.entries(data).forEach(([key, item]) => {
             const node = this.data.nodes[key];
-            this.data.nodes[key] = { ...node, ...item };
+            this.data.nodes[key] = merge(node, item);
           });
         }
       }),
