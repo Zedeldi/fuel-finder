@@ -1,3 +1,4 @@
+import path from "path";
 import express, { type RequestHandler } from "express";
 
 import config from "./config.js";
@@ -21,6 +22,8 @@ const parseUrlParams: RequestHandler = (req, res, next) => {
     : effectiveStartTimestamp;
   next();
 };
+
+app.use(express.static(path.resolve(import.meta.dirname, "../public/")));
 
 app.get("/pfs", parseUrlParams, async (_req, res) => {
   res.send(

@@ -1,0 +1,117 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Fuel Finder</title>
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <meta name="description" content="Find nearby fuel stations and prices" />
+    <link
+      rel="stylesheet"
+      href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+      integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY="
+      crossorigin=""
+    />
+    <script
+      src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+      integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo="
+      crossorigin=""
+    ></script>
+    <style>
+      html,
+      body {
+        height: 100%;
+        margin: 0;
+      }
+
+      #map {
+        height: 100vh;
+        width: 100wh;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="map"></div>
+  </body>
+  <script>
+    class Map {
+      constructor(id, options = {}) {
+        const {
+          latitude = 51.505,
+          longitude = -0.09,
+          initialZoom = 13,
+          maxZoom = 19,
+          minZoom = 5,
+          thresholdZoom = 10,
+          refreshInterval = 60 * 1000,
+          url = "https://tile.openstreetmap.org/{z}/{x}/{y}.png",
+          attribution = '&copy; <a href="http://www.openstreetmap.org/copyright">OpenStreetMap</a>',
+        } = options;
+        this.map = L.map(id).setView([latitude, longitude], initialZoom);
+        this.markers = [];
+        this.thresholdZoom = thresholdZoom;
+        this.refreshInterval = refreshInterval;
+        L.tileLayer(url, {
+          maxZoom: maxZoom,
+          minZoom: minZoom,
+          attribution: attribution,
+        }).addTo(this.map);
+      }
+
+      async refreshNodes() {
+        const response = await fetch("/node");
+        this.nodes = await response.json();
+      }
+
+      clearMarkers() {
+        for (const marker of this.markers) {
+          this.map.removeLayer(marker);
+        }
+      }
+
+      addMarkers() {
+        this.clearMarkers();
+        if (this.map.getZoom() < this.thresholdZoom) return;
+        const bounds = this.map.getBounds();
+        Object.keys(this.nodes).forEach((id) => {
+          const node = this.nodes[id];
+          if (!node.location) return;
+          const latLng = L.latLng(
+            node.location.latitude,
+            node.location.longitude,
+          );
+          if (!bounds.contains(latLng)) return;
+          const marker = L.marker(latLng).addTo(this.map);
+          const name = node.is_same_trading_and_brand_name
+            ? node.trading_name
+            : `${node.trading_name} - ${node.brand_name}`;
+          const prices = node.fuel_prices
+            ? node.fuel_prices
+                .map((fuel) => `${fuel.fuel_type}: ${fuel.price}`)
+                .join("<br>")
+            : "";
+          marker.bindPopup(`${name}<br>${prices}`);
+          this.markers.push(marker);
+        });
+      }
+
+      async start() {
+        await this.refreshNodes();
+        this.addMarkers(this.map);
+        this.map.on("moveend", () => {
+          this.addMarkers();
+        });
+        setInterval(
+          async () => await this.refreshNodes(),
+          this.refreshInterval,
+        );
+      }
+    }
+
+    async function main() {
+      const map = new Map("map");
+      await map.start();
+    }
+
+    main();
+  </script>
+</html>
