@@ -1,6 +1,6 @@
 # fuel-finder
 
-[![GitHub license](https://img.shields.io/github/license/Zedeldi/fuel-finder?style=flat-square)](https://github.com/Zedeldi/fuel-finder/blob/master/LICENSE) [![GitHub last commit](https://img.shields.io/github/last-commit/Zedeldi/fuel-finder?style=flat-square)](https://github.com/Zedeldi/fuel-finder/commits) [![Code style: black](https://img.shields.io/badge/code%20style-prettier-1a2b34.svg?style=flat-square)](https://prettier.io/)
+[![GitHub license](https://img.shields.io/github/license/Zedeldi/fuel-finder?style=flat-square)](https://github.com/Zedeldi/fuel-finder/blob/main/LICENSE) [![GitHub last commit](https://img.shields.io/github/last-commit/Zedeldi/fuel-finder?style=flat-square)](https://github.com/Zedeldi/fuel-finder/commits) [![Code style: prettier](https://img.shields.io/badge/code%20style-prettier-1a2b34.svg?style=flat-square)](https://prettier.io/)
 
 TypeScript client for the Fuel Finder API.
 
